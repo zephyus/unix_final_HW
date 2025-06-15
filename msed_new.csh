@@ -60,10 +60,10 @@ end
 #We also want to get rid of the space added by line 8, above:
 #And we want to prevent any "\" that is itself backquoted (\\) from being used
 #to backquote anything else. This is handled by turning them into "\a"s. 
-cat t5 | awk '_______' > t6
+cat t5 | awk '{gsub(/\\\\/, "\a"); sub(/^./, ""); gsub(/\\;/, "\f"); gsub(/;/, "\n;"); print}' > t6
 
 #Create an awk file from the part of this file below the exit:
-awk ______ < msed > t7
+awk 'found{print} /^exit/{found=1}' < msed > t7
 
 #Use the awk program created on line 35, above, in order to process the file
 #created on line 32 above (which, you will recall, is derived from argument 1,
