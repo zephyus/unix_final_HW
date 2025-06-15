@@ -43,7 +43,7 @@ foreach i ( "`seq $# -1 2`" )
    #Within the t5 file, iteratively look for the $2, then the $3, etc.
    #If you find a match, create a new file t6, where the argument is replaced
    #by the actual argument value. 
-   cat t5 | awk '_________' > t6
+   cat t5 | awk '{while(match($0,/([^\\])\$'$i'/)){ $0=substr($0,1,RSTART-1) substr($0,RSTART,1) "'$argv[$i]'" substr($0,RSTART+RLENGTH); } print }' > t6
    #Now move t6 back to t5, so that we are ready to set up the next argument.
    mv t6 t5
    #Since we're done processing this argument, remove it from argv, but not if
