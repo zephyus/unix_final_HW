@@ -26,6 +26,7 @@
 
 # 一次只專注於一個 _________
 # 每次完成一個之後都要立即使用多terminal指令測試：確保該部分功能正確無誤。
+# Note: You cannot use the \(.\)\1 syntax here, because awk used extended regular expressions.
 # ======================================================================
 
 
