@@ -54,16 +54,7 @@ while ( $i >= 2 )
    #by the actual argument value. 
    set rep = "$argv[$i]"
    set rep = `printf "%s" "$rep" | sed 's/[\\&]/\\\\&/g'`
-    cat t5 | awk -v rep="$rep" -v idx="$i" '
-        {
-            pat = "(^|[^\\\\])\\$" idx
-            while (match($0, pat, m)) {
-                pre  = substr($0, 1, RSTART - 1)
-                post = substr($0, RSTART + RLENGTH)
-                $0 = pre m[1] rep post
-            }
-            print
-        }' > t6
+    cat t5 | awk -v rep="$rep" -v idx="$i" '{pat="(^|[^\\\\])\\$" idx; while(match($0,pat,m)){pre=substr($0,1,RSTART-1); post=substr($0,RSTART+RLENGTH); $0=pre m[1] rep post} print}' > t6
    #Now move t6 back to t5, so that we are ready to set up the next argument.
    mv t6 t5
    #Since we're done processing this argument, remove it from argv, but not if
@@ -82,19 +73,10 @@ endif
 #We also want to get rid of the space added by line 8, above:
 #And we want to prevent any "\" that is itself backquoted (\\) from being used
 #to backquote anything else. This is handled by turning them into "\a"s. 
-cat t5 | awk '{
-    gsub(/\\\\\\;/, "\b");
-    gsub(/\\\\;/, "\f");
-    gsub(/\\\\/, "\a");
-    if (NR==1) sub(/^ /, "");
-    gsub(/;/, "\n;");
-    gsub(/\b/, "\\\\;");
-    gsub(/\f/, "\\;" );
-    print
-}' > t6
+cat t5 | awk '{gsub(/\\\\\\;/, "\b"); gsub(/\\\\;/, "\f"); gsub(/\\\\/, "\a"); if(NR==1) sub(/^ /, ""); gsub(/;/, "\n;"); gsub(/\b/, "\\\\;"); gsub(/\f/, "\\;" ); print}' > t6
 
 #Create an awk file from the part of this file below the exit:
-awk '/^# *The rest of this file is awk code/{f=1;next} f' < msed > t7
+awk '/^# *The rest of this file is awk code/{f=1;next} f' < $0:q > t7
 
 #Use the awk program created on line 35, above, in order to process the file
 #created on line 32 above (which, you will recall, is derived from argument 1,
@@ -121,7 +103,11 @@ end
 
 #Line 62 above created t9, the ordinary sed implementation of the original
 #program the user had provided in $1. So we replace $1 with t9:
-set argv[1] = -ft9
+if ( $#argv >= 1 ) then
+    set argv[1] = -ft9
+else
+    set argv = ( -ft9 )
+endif
 
 #Line 3 had captured the piped-in input into t4. So we now process it:
 cat t4 | sed $*:q
