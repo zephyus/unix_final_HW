@@ -75,10 +75,14 @@ rm -f t9
 @ cnt = 0
 @ z = 0
 set nonomatch
+set noglob
 
 #Go through the version of sed commands stored in t8 (created from Line 40
 #above), to see if any of the commands used a $-# syntax or a "f" or "F":
-foreach x ( `cat t8`)
+@ i = 1
+@ nlines = `cat t8 | wc -l`
+while ( $i <= $nlines )
+   set x = `sed -n "$i"p t8`
    #Here, x is a single line from t8, so it is usually a single sed command.
    #Now we want to make a variable y that will be the number # of any $-# that
    #might be on this line x. (Let y be "" otherwise.):
@@ -95,6 +99,7 @@ foreach x ( `cat t8`)
 
    #Increase the counter used for the branch labels on line 63, above:
    @ cnt = $cnt + 1
+   @ i++
 end
 
 #Line 62 above created t9, the ordinary sed implementation of the original
