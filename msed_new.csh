@@ -298,20 +298,10 @@ exit 0
         print gb[2]
         next
     }
-    if (sub(/^[[:space:]]*D/, "h;d")) {
-        split(guard_block(), gb, "\n")
-        print gb[1]
-        print
-        print gb[2]
+    if (sub(/^[[:space:]]*D/, "h;d"))
         next
-    }
-    if (sub(/^[[:space:]]*C/, "H")) {
-        split(guard_block(), gb, "\n")
-        print gb[1]
-        print
-        print gb[2]
+    if (sub(/^[[:space:]]*C/, "H"))
         next
-    }
     sub(/^[[:space:]]*f/, "t")
     sub(/^[[:space:]]*F/, "Tlabel7;:label7")
 }
@@ -343,7 +333,7 @@ function guard_block(  plabel, elabel, pre, post) {
     n = split($0, lines, "\n")
     for (i = 1; i <= n; i++) {
         line = lines[i]
-        if (line ~ /^[^[:alpha:]]*s[^[:alnum:]]/) {
+        if (line ~ /(^|[^\\0-9A-Za-z])s[^0-9A-Za-z]/) {
             split(guard_block(), gb, "\n")
             print gb[1]
             print line
