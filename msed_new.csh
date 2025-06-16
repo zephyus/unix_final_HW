@@ -33,14 +33,22 @@
 #Save the piped-in input into a file:
 cat > t4
 
-#Create a file and put $1 into it, but also add a space in front of it. (The
-#space is added so that line 17 below is facilitated. Further, see footnote 1
-#for information on why it is argument 1 that gets put into the file):
-echo \ $1:q > t5
+#If the first argument is "-", it means the msed program comes from
+#standard input rather than a real file.  In that case copy the
+#already-saved input (t4) to t5 and shift the argument list so that
+#$argv[1] always holds the script source.  Otherwise store the first
+#argument in t5 with a leading space to simplify later processing.
+if ( "$argv[1]" == "-" ) then
+    cp t4 t5
+    shift argv
+else
+    echo \ $1:q > t5
+endif
 
 #Loop through all of the passed-in arguments except for the first argument:
 if ( $#argv >= 2 ) then
-foreach i ( `seq $# -1 2` )
+@ i = $#argv
+while ( $i >= 2 )
    #Within the t5 file, iteratively look for the $2, then the $3, etc.
    #If you find a match, create a new file t6, where the argument is replaced
    #by the actual argument value. 
@@ -62,6 +70,7 @@ foreach i ( `seq $# -1 2` )
    #it's a flag that starts with a "-" (but remember that Cshell if-conditions
    #have a problem to overcome, when testing things that start with a "-").
    if ( X$argv[$i] !~ "X-*" ) set argv[$i] = ""
+   @ i--
 end
 endif
 
@@ -73,7 +82,16 @@ endif
 #We also want to get rid of the space added by line 8, above:
 #And we want to prevent any "\" that is itself backquoted (\\) from being used
 #to backquote anything else. This is handled by turning them into "\a"s. 
-cat t5 | awk '{gsub(/\\\\;/, "\f"); gsub(/\\\\/, "\a"); if (NR==1) sub(/^ /, ""); gsub(/\\;/, "\f"); gsub(/;/, "\n;"); print}' > t6
+cat t5 | awk '{
+    gsub(/\\\\\\;/, "\b");
+    gsub(/\\\\;/, "\f");
+    gsub(/\\\\/, "\a");
+    if (NR==1) sub(/^ /, "");
+    gsub(/;/, "\n;");
+    gsub(/\b/, "\\\\;");
+    gsub(/\f/, "\\;" );
+    print
+}' > t6
 
 #Create an awk file from the part of this file below the exit:
 awk '/^# *The rest of this file is awk code/{f=1;next} f' < msed > t7
@@ -296,15 +314,16 @@ exit 0
         split(guard_block(), gb, "\n")
         print rename_labels(gb[1])
         sub(/^[[:space:]]*D[ \t]*/, "")
-        $0 = "x; s/.*//; x; " gb[2] "; d"
+        $0 = "x; s/.*//; x; d"
         print rename_labels($0)
+        print rename_labels(gb[2])
         next
     }
     if ($0 ~ /^[[:space:]]*C([[:space:]]|$)/) {
         split(guard_block(), gb, "\n")
         print rename_labels(gb[1])
         sub(/^[[:space:]]*C[ \t]*/, "")
-        $0 = "x; s/\\r\\v$//; x; H"
+        $0 = "H; x; s/\\r\\v$//; x"
         print rename_labels($0)
         print rename_labels(gb[2])
         next
@@ -366,6 +385,7 @@ function rename_labels(line,    k, mat, pre, post) {
 }
 
 {
+    gsub(/\b/, "\\\\;")
     gsub(/\f/, "\\;")
     gsub(/\a/, "\\\\")
     n = split($0, lines, "\n")
