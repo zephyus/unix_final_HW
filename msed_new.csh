@@ -109,7 +109,7 @@ while ( $i <= $nlines )
    #So now we take the single line $x and clean it up. The $-# will turn into
    #the number $z. Also to fix: make the branches used for "F" unique, by
    #adding a counter number to the end of whateven branch label may be in #x.
-   echo $x:q | awk '{gsub(/label7/, "label7" '$cnt'); sub(/\$-\\\\v[0-9]+/, '$z'); print}' >> t9
+   echo $x:q | awk '{gsub(/label7/, "label7" '$cnt'); gsub(/\$-\\\\v[0-9]+/, '$z'); print}' >> t9
 
    #Increase the counter used for the branch labels on line 63, above:
    @ cnt = $cnt + 1
@@ -302,8 +302,8 @@ exit 0
         next
     if (sub(/^[[:space:]]*C/, "H"))
         next
-    sub(/^[[:space:]]*f/, "t")
-    sub(/^[[:space:]]*F/, "Tlabel7;:label7")
+    sub(/^[[:space:]]*f/, "s/^//")
+    sub(/^[[:space:]]*F/, "tlabel7;:label7")
 }
 
 #These add an unusual symbol ("\v", which doesn't occur in the input) to mark
