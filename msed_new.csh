@@ -73,7 +73,7 @@ endif
 #We also want to get rid of the space added by line 8, above:
 #And we want to prevent any "\" that is itself backquoted (\\) from being used
 #to backquote anything else. This is handled by turning them into "\a"s. 
-cat t5 | awk '{gsub(/\\\\/, "\a"); if (NR==1) sub(/^ /, ""); gsub(/\\;/, "\f"); gsub(/;/, "\n;"); print}' > t6
+cat t5 | awk '{gsub(/\\\\;/, "\f"); gsub(/\\\\/, "\a"); if (NR==1) sub(/^ /, ""); gsub(/\\;/, "\f"); gsub(/;/, "\n;"); print}' > t6
 
 #Create an awk file from the part of this file below the exit:
 awk '/^# *The rest of this file is awk code/{f=1;next} f' < msed > t7
@@ -280,37 +280,42 @@ exit 0
 {
     if (sub(/^[[:space:]]*Z/, "s/.*//")) {
         split(guard_block(), gb, "\n")
-        print gb[1]
-        print
-        print gb[2]
+        print rename_labels(gb[1])
+        print rename_labels($0)
+        print rename_labels(gb[2])
         next
     }
     if (sub(/^[[:space:]]*W/, "s/.*//;g;s/.*//;G")) {
         split(guard_block(), gb, "\n")
-        print gb[1]
-        print
-        print gb[2]
+        print rename_labels(gb[1])
+        print rename_labels($0)
+        print rename_labels(gb[2])
         next
     }
-    if (sub(/^[[:space:]]*D/, "x; s/.*//; x; d")) {
+    if ($0 ~ /^[[:space:]]*D([[:space:]]|$)/) {
         split(guard_block(), gb, "\n")
-        print gb[1]
-        print
-        print gb[2]
+        print rename_labels(gb[1])
+        sub(/^[[:space:]]*D[ \t]*/, "")
+        $0 = "x; s/.*//; x; " gb[2] "; d"
+        print rename_labels($0)
         next
     }
-    if (sub(/^[[:space:]]*C/, "H; x; s/\\r\\v$//; x")) {
+    if ($0 ~ /^[[:space:]]*C([[:space:]]|$)/) {
         split(guard_block(), gb, "\n")
-        print gb[1]
-        print
-        print gb[2]
+        print rename_labels(gb[1])
+        sub(/^[[:space:]]*C[ \t]*/, "")
+        $0 = "x; s/\\r\\v$//; x; H"
+        print rename_labels($0)
+        print rename_labels(gb[2])
         next
     }
     if (match($0, /^[[:space:]]*f[ \t]+([A-Za-z0-9_]+)/, m)) {
         lbl = m[1]
         sub(/^[[:space:]]*f[ \t]+[A-Za-z0-9_]+/, "x; /\\r\\v$/!b " lbl "; x")
     } else if (match($0, /^[[:space:]]*F[ \t]+([A-Za-z0-9_]+)/, m)) {
-        lbl = m[1] "_" fcnt
+        orig = m[1]
+        lbl = orig "_" fcnt
+        fmap[orig] = lbl
         sub(/^[[:space:]]*F[ \t]+[A-Za-z0-9_]+/, "x; /\\r\\v$/b " lbl "; x")
         fcnt++
     }
@@ -319,13 +324,15 @@ exit 0
 #These add an unusual symbol ("\v", which doesn't occur in the input) to mark
 #out the $-#, so that line 63 above can find them and convert them:
 {
-    $0 = gensub(/\$-([0-9]+)/, "\\$-\\\\v\\1", "g")
+    while (match($0, /\$-([0-9]+)/, m))
+        $0 = substr($0, 1, RSTART+1) "\\v" m[1] substr($0, RSTART + RLENGTH)
 }
 
 #These clean up the backquotes:
 BEGIN {
     flcnt=0
     fcnt=0
+    split("", fmap)
 }
 
 function guard_block(  plabel, elabel, pre, post) {
@@ -335,6 +342,15 @@ function guard_block(  plabel, elabel, pre, post) {
     pre="T" plabel "; x; s/$/\\r\\v/; x; :" plabel
     post="T" elabel "; :" elabel "; x; s/\\r\\v$//; x"
     return pre "\n" post
+}
+
+function rename_labels(line,    k) {
+    for (k in fmap) {
+        gsub(":" k "([^A-Za-z0-9_]|$)", ":" fmap[k] "\\1", line)
+        gsub("b[ \t]+" k "([^A-Za-z0-9_]|$)", "b " fmap[k] "\\1", line)
+        gsub("t[ \t]+" k "([^A-Za-z0-9_]|$)", "t " fmap[k] "\\1", line)
+    }
+    return line
 }
 
 {
@@ -348,11 +364,11 @@ function guard_block(  plabel, elabel, pre, post) {
         if (trimmed ~ /(^|[,0-9$\/\\])s[^0-9A-Za-z]/ ||
             trimmed ~ /(^|[,0-9$\/\\])y[^0-9A-Za-z]/) {
             split(guard_block(), gb, "\n")
-            print gb[1]
-            print line
-            print gb[2]
+            print rename_labels(gb[1])
+            print rename_labels(line)
+            print rename_labels(gb[2])
         } else {
-            print line
+            print rename_labels(line)
         }
     }
 }
