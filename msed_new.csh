@@ -43,7 +43,7 @@ foreach i ( "`seq $#argv -1 2`" )
    #Within the t5 file, iteratively look for the $2, then the $3, etc.
    #If you find a match, create a new file t6, where the argument is replaced
    #by the actual argument value. 
-   cat t5 | awk '{while(match($0,/([^\\])\$'$i'/)){ $0=substr($0,1,RSTART-1) substr($0,RSTART,1) "'$argv[$i]'" substr($0,RSTART+RLENGTH); } print }' > t6
+   cat t5 | awk '{ $0 = gensub(/(^|[^\\])\$'$i'/, "\\1'$argv[$i]'", "g"); print }' > t6
    #Now move t6 back to t5, so that we are ready to set up the next argument.
    mv t6 t5
    #Since we're done processing this argument, remove it from argv, but not if
@@ -60,10 +60,10 @@ end
 #We also want to get rid of the space added by line 8, above:
 #And we want to prevent any "\" that is itself backquoted (\\) from being used
 #to backquote anything else. This is handled by turning them into "\a"s. 
-cat t5 | awk '{gsub(/\\\\/, "\a"); sub(/^./, ""); gsub(/\\;/, "\f"); gsub(/;/, "\n;"); print}' > t6
+cat t5 | awk '{gsub(/\\\\/, "\a"); if (NR==1) sub(/^./, ""); gsub(/\\;/, "\f"); gsub(/;/, "\n;"); print}' > t6
 
 #Create an awk file from the part of this file below the exit:
-awk 'found{print} /^exit/{found=1}' < msed > t7
+awk 'found{print} /^[[:space:]]*exit/{found=1}' < msed > t7
 
 #Use the awk program created on line 35, above, in order to process the file
 #created on line 32 above (which, you will recall, is derived from argument 1,
@@ -95,7 +95,7 @@ while ( $i <= $nlines )
    #So now we take the single line $x and clean it up. The $-# will turn into
    #the number $z. Also to fix: make the branches used for "F" unique, by
    #adding a counter number to the end of whateven branch label may be in #x.
-   echo $x:q | awk '{gsub(/label7/, "label7" '$cnt'); gsub(/\$-\\\\v[0-9]+/, '$z'); print}' >> t9
+   echo $x:q | awk '{gsub(/label7/, "label7" '$cnt'); sub(/\$-\\\\v[0-9]+/, '$z'); print}' >> t9
 
    #Increase the counter used for the branch labels on line 63, above:
    @ cnt = $cnt + 1
@@ -191,10 +191,10 @@ exit 0
 
 #Now put a \v after whatever predication may be given (including none)
 {
-    $0 = gensub(/\\v(, *\/.*\/ *)/, "\\1\\\\v", 1)
-    $0 = gensub(/\\v(, *\\(.\\).*\\1 *)/, "\\1\\\\v", 1)
-    $0 = gensub(/\\v(, *[0-9]+ *)/, "\\1\\\\v", 1)
-    $0 = gensub(/\\v(, *\$ *)/, "\\1\\\\v", 1)
+    $0 = gensub(/\\v(, *\/.*\/ *)/, "\\1\\v", 1)
+    $0 = gensub(/\\v(, *(.).*\\1 *)/, "\\1\\v", 1)
+    $0 = gensub(/\\v(, *[0-9]+ *)/, "\\1\\v", 1)
+    $0 = gensub(/\\v(, *\$ *)/, "\\1\\v", 1)
     if ($0 !~ /\\v/)
         sub(/^ */, "&\\v")
 }
@@ -228,15 +228,19 @@ exit 0
 #So "s{x{y{g"  =>  No change.
 
 {
-    if ($0 ~ /\{/ && $0 !~ /^s\{/) sub(/\{/, "{\n")
+    if ($0 ~ /\{/ && $0 !~ /^s\{/) {
+        pos = index($0, "{")
+        print substr($0, 1, pos)
+        $0 = substr($0, pos+1)
+    }
 }
 
 #Simple translations for the new commands Z, W, D, C, f, and F:
 {
-    sub(/^Z/, "s/.*//")
-    sub(/^W/, "s/.*//;g;s/.*//;G")
-    sub(/^D/, "h;d")
-    sub(/^C/, "H")
+    if (sub(/^Z/, "s/.*//")) { print pro_line(); print; print epi_line(); next }
+    if (sub(/^W/, "s/.*//;g;s/.*//;G")) { print pro_line(); print; print epi_line(); next }
+    if (sub(/^D/, "h;d")) { print pro_line(); print; print epi_line(); next }
+    if (sub(/^C/, "H")) { print pro_line(); print; print epi_line(); next }
     sub(/^f/, "t")
     sub(/^F/, "T")
 }
@@ -250,8 +254,20 @@ exit 0
 
 #These clean up the backquotes:
 BEGIN {
-    pro="TflagL1; x; s/$/\\r\\v/; x; :flagL1"
-    epi="TflagL2; :flagL2; x; s/\\r\\v$//; x"
+    flcnt=0
+}
+
+function pro_line() {
+    flcnt++
+    plabel="flagL1" flcnt
+    elabel="flagL2" flcnt
+    pro_val="T" plabel "; x; s/$/\\r\\v/; x; :" plabel
+    epi_val="T" elabel "; :" elabel "; x; s/\\r\\v$//; x"
+    return pro_val
+}
+
+function epi_line() {
+    return epi_val
 }
 
 {
@@ -260,16 +276,6 @@ BEGIN {
     n = split($0, lines, "\n")
     for (i = 1; i <= n; i++) {
         line = lines[i]
-        if (line ~ /^\s*[^{#].*$/) {
-            tmp = line
-            sub(/^\s*/, "", tmp)
-            if (tmp ~ /^s[^A-Za-z0-9]/ && tmp != "s/^//") {
-                print pro
-                print line
-                print epi
-                continue
-            }
-        }
         print line
     }
 }
