@@ -298,10 +298,20 @@ exit 0
         print gb[2]
         next
     }
-    if (sub(/^[[:space:]]*D/, "h;d"))
+    if (sub(/^[[:space:]]*D/, "h;d")) {
+        split(guard_block(), gb, "\n")
+        print gb[1]
+        print
+        print gb[2]
         next
-    if (sub(/^[[:space:]]*C/, "H"))
+    }
+    if (sub(/^[[:space:]]*C/, "H")) {
+        split(guard_block(), gb, "\n")
+        print gb[1]
+        print
+        print gb[2]
         next
+    }
     sub(/^[[:space:]]*f/, "s/^//")
     sub(/^[[:space:]]*F/, "tlabel7;:label7")
 }
