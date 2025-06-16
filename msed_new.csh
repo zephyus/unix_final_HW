@@ -310,20 +310,22 @@ exit 0
         lbl = m[1]
         sub(/^[[:space:]]*f[ \t]+[A-Za-z0-9_]+/, "x; /\\r\\v$/!b " lbl "; x")
     } else if (match($0, /^[[:space:]]*F[ \t]+([A-Za-z0-9_]+)/, m)) {
-        lbl = m[1]
+        lbl = m[1] "_" fcnt
         sub(/^[[:space:]]*F[ \t]+[A-Za-z0-9_]+/, "x; /\\r\\v$/b " lbl "; x")
+        fcnt++
     }
 }
 
 #These add an unusual symbol ("\v", which doesn't occur in the input) to mark
 #out the $-#, so that line 63 above can find them and convert them:
 {
-    gsub(/\$-[0-9]+/, "&\\v")
+    $0 = gensub(/\$-([0-9]+)/, "\\$-\\\\v\\1", "g")
 }
 
 #These clean up the backquotes:
 BEGIN {
     flcnt=0
+    fcnt=0
 }
 
 function guard_block(  plabel, elabel, pre, post) {
