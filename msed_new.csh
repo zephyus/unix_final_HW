@@ -39,11 +39,14 @@ cat > t4
 echo \ $1:q > t5
 
 #Loop through all of the passed-in arguments except for the first argument:
+if ( $#argv >= 2 ) then
 foreach i ( "`seq $#argv -1 2`" )
    #Within the t5 file, iteratively look for the $2, then the $3, etc.
    #If you find a match, create a new file t6, where the argument is replaced
    #by the actual argument value. 
-   cat t5 | awk '{ $0 = gensub(/(^|[^\\])\$'$i'/, "\\1'$argv[$i]'", "g"); print }' > t6
+   set rep = "$argv[$i]"
+   set rep = `printf "%s" "$rep" | sed 's/[\\&]/\\\\&/g'`
+   cat t5 | awk -v rep="$rep" '{ $0 = gensub(/(^|[^\\])\$'$i'/, "\\1" rep, "g"); print }' > t6
    #Now move t6 back to t5, so that we are ready to set up the next argument.
    mv t6 t5
    #Since we're done processing this argument, remove it from argv, but not if
@@ -51,6 +54,7 @@ foreach i ( "`seq $#argv -1 2`" )
    #have a problem to overcome, when testing things that start with a "-").
    if ( X$argv[$i] !~ "X-*" ) set argv[$i] = ""
 end
+endif
 
 #Now we want to use almost every ";" into a line separation.
 #   A line separator? Yes: The ";" becomes "\n;"
@@ -60,7 +64,7 @@ end
 #We also want to get rid of the space added by line 8, above:
 #And we want to prevent any "\" that is itself backquoted (\\) from being used
 #to backquote anything else. This is handled by turning them into "\a"s. 
-cat t5 | awk '{gsub(/\\\\/, "\a"); if (NR==1) sub(/^./, ""); gsub(/\\;/, "\f"); gsub(/;/, "\n;"); print}' > t6
+cat t5 | awk '{gsub(/\\\\/, "\a"); if (NR==1) sub(/^ /, ""); gsub(/\\;/, "\f"); gsub(/;/, "\n;"); print}' > t6
 
 #Create an awk file from the part of this file below the exit:
 awk 'found{print} /^[[:space:]]*exit/{found=1}' < msed > t7
@@ -192,7 +196,11 @@ exit 0
 #Now put a \v after whatever predication may be given (including none)
 {
     $0 = gensub(/\\v(, *\/.*\/ *)/, "\\1\\v", 1)
-    $0 = gensub(/\\v(, *(.).*\\1 *)/, "\\1\\v", 1)
+    if (match($0, /\\v, *\\(.)/, m)) {
+        d = m[1]
+        pat = "\\\\v(, *\\\\" d "[^" d "]*" d " *)"
+        $0 = gensub(pat, "\\1\\v", 1)
+    }
     $0 = gensub(/\\v(, *[0-9]+ *)/, "\\1\\v", 1)
     $0 = gensub(/\\v(, *\$ *)/, "\\1\\v", 1)
     if ($0 !~ /\\v/)
@@ -237,12 +245,12 @@ exit 0
 
 #Simple translations for the new commands Z, W, D, C, f, and F:
 {
-    if (sub(/^Z/, "s/.*//")) { print pro_line(); print; print epi_line(); next }
-    if (sub(/^W/, "s/.*//;g;s/.*//;G")) { print pro_line(); print; print epi_line(); next }
-    if (sub(/^D/, "h;d")) { print pro_line(); print; print epi_line(); next }
-    if (sub(/^C/, "H")) { print pro_line(); print; print epi_line(); next }
-    sub(/^f/, "t")
-    sub(/^F/, "T")
+    if (sub(/^[[:space:]]*Z/, "s/.*//")) { print pro_line(); print; print epi_line(); next }
+    if (sub(/^[[:space:]]*W/, "s/.*//;g;s/.*//;G")) { print pro_line(); print; print epi_line(); next }
+    if (sub(/^[[:space:]]*D/, "h;d")) { print pro_line(); print; print epi_line(); next }
+    if (sub(/^[[:space:]]*C/, "H")) { print pro_line(); print; print epi_line(); next }
+    sub(/^[[:space:]]*f/, "t")
+    sub(/^[[:space:]]*F/, "Tlabel7;:label7")
 }
 
 #These add an unusual symbol ("\v", which doesn't occur in the input) to mark
@@ -276,7 +284,13 @@ function epi_line() {
     n = split($0, lines, "\n")
     for (i = 1; i <= n; i++) {
         line = lines[i]
-        print line
+        if (line ~ /^[^[:alpha:]]*s[^[:alnum:]]/) {
+            print pro_line()
+            print line
+            print epi_line()
+        } else {
+            print line
+        }
     }
 }
 
