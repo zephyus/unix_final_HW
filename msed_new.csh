@@ -39,11 +39,11 @@ cat > t4
 echo \ $1:q > t5
 
 #Loop through all of the passed-in arguments except for the first argument:
-foreach i ( "`seq $# -1 2`" )
+foreach i ( "`seq $#argv -1 2`" )
    #Within the t5 file, iteratively look for the $2, then the $3, etc.
    #If you find a match, create a new file t6, where the argument is replaced
    #by the actual argument value. 
-   cat t5 | awk '_________' > t6
+   cat t5 | awk '{while(match($0,/([^\\])\$'$i'/)){ $0=substr($0,1,RSTART-1) substr($0,RSTART,1) "'$argv[$i]'" substr($0,RSTART+RLENGTH); } print }' > t6
    #Now move t6 back to t5, so that we are ready to set up the next argument.
    mv t6 t5
    #Since we're done processing this argument, remove it from argv, but not if
@@ -60,10 +60,10 @@ end
 #We also want to get rid of the space added by line 8, above:
 #And we want to prevent any "\" that is itself backquoted (\\) from being used
 #to backquote anything else. This is handled by turning them into "\a"s. 
-cat t5 | awk '_______' > t6
+cat t5 | awk '{gsub(/\\\\/, "\a"); sub(/^./, ""); gsub(/\\;/, "\f"); gsub(/;/, "\n;"); print}' > t6
 
 #Create an awk file from the part of this file below the exit:
-awk ______ < msed > t7
+awk 'found{print} /^exit/{found=1}' < msed > t7
 
 #Use the awk program created on line 35, above, in order to process the file
 #created on line 32 above (which, you will recall, is derived from argument 1,
@@ -81,7 +81,7 @@ foreach x ( `cat t8`)
    #Here, x is a single line from t8, so it is usually a single sed command.
    #Now we want to make a variable y that will be the number # of any $-# that
    #might be on this line x. (Let y be "" otherwise.):
-   set y = `echo $x:q | awk '_______________'`
+    set y = `echo $x:q | awk '{if(match($0,/\$-\\v([0-9]+)/,m))print m[1]}'`
 
    #So now, what if $y==a number? Well that means that we need to work out
    #what line number would match to $#-1? Set z to that line number:
@@ -90,7 +90,7 @@ foreach x ( `cat t8`)
    #So now we take the single line $x and clean it up. The $-# will turn into
    #the number $z. Also to fix: make the branches used for "F" unique, by
    #adding a counter number to the end of whateven branch label may be in #x.
-   echo $x:q | awk ______________________ >> t9
+   echo $x:q | awk '{gsub(/label7/, "label7" '$cnt'); gsub(/\$-\\v[0-9]+/, '$z'); print}' >> t9
 
    #Increase the counter used for the branch labels on line 63, above:
    @ cnt = $cnt + 1
@@ -125,33 +125,67 @@ exit 0
 #      for i, a, c, C, w, W, r.
 
 #This section combines lines to form /.../ or \x...x -- if there are ; in it:
-________
-   .
-   .
-   .
-________
+{
+    if ($0 ~ /^[\\/]/) {
+        while ($0 !~ /^\/.*\/$/ && !match($0, /^\\(.\\).*\\1/)) {
+            if (getline nxt > 0)
+                if (nxt ~ /^;/)
+                    $0 = $0 nxt
+                else
+                    $0 = $0 ";" nxt
+            else
+                break
+        }
+    }
+}
 
 #Now we consider ", /.../" or ", \x...x" since these can have ;
 #Step 1 is to mark off the part that might go before the , by using a \v
-________
-   .
-   .
-   .
-________
+{
+    if ($0 ~ /^\/.*\/[ \t]*/) sub(/^\/.*\/[ \t]*/, "&\\v")
+    if ($0 ~ /^\\(.\\).*\\1[ \t]*/) sub(/^\\(.\\).*\\1[ \t]*/, "&\\v")
+    if ($0 ~ /^[0-9]+[ \t]*/) sub(/^[0-9]+[ \t]*/, "&\\v")
+    if ($0 ~ /^\$[ \t]*/) sub(/^\$[ \t]*/, "&\\v")
+
+    if ($0 ~ /\\v, *[\\/]/) {
+        while ($0 !~ /\\v, *\/.*\// && !match($0, /\\v, *\\(.\\).*\\1/)) {
+            if (getline nxt > 0)
+                if (nxt ~ /^;/)
+                    $0 = $0 nxt
+                else
+                    $0 = $0 ";" nxt
+            else
+                break
+        }
+    }
+}
 
 #Now put a \v after whatever predication may be given (including none)
-________
-   .
-   .
-   .
-________
+{
+    sub(/\\v(, *\/.*\/ *)/, "\\1\\v")
+    sub(/\\v(, *\\(.\\).*\\1 *)/, "\\1\\v")
+    sub(/\\v(, *[0-9]+ *)/, "\\1\\v")
+    sub(/\\v(, *\$ *)/, "\\1\\v")
+    if ($0 !~ /\\v/)
+        sub(/^ */, "&\\v")
+}
 
 #Now deal with y and s comands that might use ";"
-________
-   .
-   .
-   .
-________
+{
+    if ($0 ~ /^\\v[ys]/) {
+        while ($0 !~ /^\\v[ys](.).*\\1.*\\1/) {
+            if (getline nxt > 0)
+                if (nxt ~ /^;/)
+                    $0 = $0 nxt
+                else
+                    $0 = $0 ";" nxt
+            else
+                break
+        }
+    }
+    sub(/^;/, "")
+    sub(/\\v/, "")
+}
 
 #
 #So now we have whole sed commands on lines. By I am adding a new part here:
@@ -166,24 +200,28 @@ ________
 #msed program is using. (That is: you saw how my solution on the last homework
 #had logic to keep your code from breaking the hold space or the flag state;
 #this homework must retain that.)
-________
-   .
-   .
-   .
-________
+{
+    sub(/^Z/, "s/[^\\n]\\n\\{,1\\}//")
+    if (match($0, /^W(.*)/, m))
+        $0 = "{ s/^/\\v/\n H\n s/.//\n s/\\n.*//\n w" m[1] "\n g\n s/\\v.*//\n x\n s/.*\\v//\n}"
+    sub(/^D$/, "{/\\n/!s/$/\\n/;D;}")
+    if (match($0, /^C(.*)/, m))
+        $0 = "s/.*/" m[1] "/"
+    sub(/^f$/, "s/^//")
+    sub(/^F$/, "tlabel7;:label7")
+}
 
 #These add an unusual symbol ("\v", which doesn't occur in the input) to mark
 #out the $-#, so that line 63 above can find them and convert them:
-________
-   .
-   .
-   .
-________
+{
+    sub(/^\$-/, "&\\v")
+    gsub(/, *\$-/, "&\\v")
+}
 
 #These clean up the backquotes:
-________
-   .
-   .
-   .
-________
+{
+    gsub(/\f/, "\\;")
+    gsub(/\a/, "\\\\")
+    print
+}
 
