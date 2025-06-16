@@ -343,7 +343,7 @@ function guard_block(  plabel, elabel, pre, post) {
     n = split($0, lines, "\n")
     for (i = 1; i <= n; i++) {
         line = lines[i]
-        if (line ~ /(^|[^\\0-9A-Za-z])s[^0-9A-Za-z]/) {
+        if (line ~ /(^|[,0-9$\/\\])s[^0-9A-Za-z]/) {
             split(guard_block(), gb, "\n")
             print gb[1]
             print line
