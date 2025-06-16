@@ -227,20 +227,14 @@ exit 0
 #So "{="       =>  print("{");$0="="
 #So "s{x{y{g"  =>  No change.
 
-#Complete the lines below to handle the cases of Z, W, D, C, f, and F. This
-#time I require that you not break the hold space or flags that the user's
-#msed program is using. (That is: you saw how my solution on the last homework
-#had logic to keep your code from breaking the hold space or the flag state;
-#this homework must retain that.)
+#Simple translations for the new commands Z, W, D, C, f, and F:
 {
-    sub(/^Z/, "s/[^\\n]\\n\\{,1\\}//")
-    if (match($0, /^W(.*)/, m))
-        $0 = "{ s/^/\\v/\n H\n s/.//\n s/\\n.*//\n w" m[1] "\n g\n s/\\v.*//\n x\n s/.*\\v//\n}"
-    sub(/^D$/, "{/\\n/!s/$/\\n/;D;}")
-    if (match($0, /^C(.*)/, m))
-        $0 = "s/.*/" m[1] "/"
-    $0 = gensub(/(^|;)f(;|$)/, "\\1s/^//\\2", "g")
-    $0 = gensub(/(^|;)F(;|$)/, "\\1tlabel7;:label7\\2", "g")
+    sub(/^Z/, "s/.*//")
+    sub(/^W/, "s/.*//;g;s/.*//;G")
+    sub(/^D/, "h;d")
+    sub(/^C/, "H")
+    sub(/^f/, "t")
+    sub(/^F/, "T")
 }
 
 #These add an unusual symbol ("\v", which doesn't occur in the input) to mark
