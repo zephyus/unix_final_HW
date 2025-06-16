@@ -46,7 +46,17 @@ foreach i ( `seq $#argv -1 2` )
    #by the actual argument value. 
    set rep = "$argv[$i]"
    set rep = `printf "%s" "$rep" | sed 's/[\\&]/\\\\&/g'`
-   cat t5 | awk -v rep="$rep" '{ $0 = gensub(/(^|[^\\])\$'$i'/, "\\1" rep, "g"); print }' > t6
+    cat t5 | awk -v rep="$rep" -v idx="$i" '
+        {
+            pat = "([^\\\\])\\$" idx
+            while (match($0, pat)) {
+                pre  = substr($0, 1, RSTART - 1)
+                pc   = substr($0, RSTART, 1)
+                post = substr($0, RSTART + RLENGTH)
+                $0 = pre pc rep post
+            }
+            print
+        }' > t6
    #Now move t6 back to t5, so that we are ready to set up the next argument.
    mv t6 t5
    #Since we're done processing this argument, remove it from argv, but not if
@@ -139,7 +149,10 @@ exit 0
     if ($0 ~ /^[\\/]/) {
         delim = substr($0,1,1) == "\\" ? substr($0,2,1) : "/"
         tmp = $0
-        split(tmp, arr, delim)
+        delim_esc = delim
+        if (delim_esc ~ /[.\^$*+?()[{\\|]/)
+            delim_esc = "\\" delim_esc
+        split(tmp, arr, delim_esc)
         cnt = length(arr)-1
         while (cnt < 2) {
             if (getline nxt > 0) {
@@ -148,7 +161,10 @@ exit 0
                 else
                     $0 = $0 ";" nxt
                 tmp = $0
-                split(tmp, arr, delim)
+                delim_esc = delim
+                if (delim_esc ~ /[.\^$*+?()[{\\|]/)
+                    delim_esc = "\\" delim_esc
+                split(tmp, arr, delim_esc)
                 cnt = length(arr)-1
             } else
                 break
@@ -174,7 +190,10 @@ exit 0
         gsub(/^ */, "", rest)
         delim = substr(rest,1,1)
         tmp = rest
-        split(tmp, arr, delim)
+        delim_esc = delim
+        if (delim_esc ~ /[.\^$*+?()[{\\|]/)
+            delim_esc = "\\" delim_esc
+        split(tmp, arr, delim_esc)
         cnt = length(arr)-1
         while (cnt < 2) {
             if (getline nxt > 0) {
@@ -185,7 +204,10 @@ exit 0
                 rest = substr($0, pos+1)
                 gsub(/^ */, "", rest)
                 tmp = rest
-                split(tmp, arr, delim)
+                delim_esc = delim
+                if (delim_esc ~ /[.\^$*+?()[{\\|]/)
+                    delim_esc = "\\" delim_esc
+                split(tmp, arr, delim_esc)
                 cnt = length(arr)-1
             } else
                 break
@@ -195,14 +217,31 @@ exit 0
 
 #Now put a \v after whatever predication may be given (including none)
 {
-    $0 = gensub(/\\v(, *\/.*\/ *)/, "\\1\\v", 1)
-    if (match($0, /\\v, *\\(.)/, m)) {
+    if (match($0, /\\v(, *\/.*\/ *)/)) {
+        pre = substr($0, 1, RSTART - 1)
+        mid = substr($0, RSTART + 2, RLENGTH - 2)
+        post = substr($0, RSTART + RLENGTH)
+        $0 = pre mid "\\v" post
+    } else if (match($0, /\\v, *\\(.)/, m)) {
         d = m[1]
         pat = "\\\\v(, *\\\\" d "[^" d "]*" d " *)"
-        $0 = gensub(pat, "\\1\\v", 1)
+        if (match($0, pat)) {
+            pre = substr($0, 1, RSTART - 1)
+            mid = substr($0, RSTART + 2, RLENGTH - 2)
+            post = substr($0, RSTART + RLENGTH)
+            $0 = pre mid "\\v" post
+        }
+    } else if (match($0, /\\v(, *[0-9]+ *)/)) {
+        pre = substr($0, 1, RSTART - 1)
+        mid = substr($0, RSTART + 2, RLENGTH - 2)
+        post = substr($0, RSTART + RLENGTH)
+        $0 = pre mid "\\v" post
+    } else if (match($0, /\\v(, *\$ *)/)) {
+        pre = substr($0, 1, RSTART - 1)
+        mid = substr($0, RSTART + 2, RLENGTH - 2)
+        post = substr($0, RSTART + RLENGTH)
+        $0 = pre mid "\\v" post
     }
-    $0 = gensub(/\\v(, *[0-9]+ *)/, "\\1\\v", 1)
-    $0 = gensub(/\\v(, *\$ *)/, "\\1\\v", 1)
     if ($0 !~ /\\v/)
         sub(/^ */, "&\\v")
 }
