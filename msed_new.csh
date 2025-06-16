@@ -39,11 +39,23 @@ cat > t4
 echo \ $1:q > t5
 
 #Loop through all of the passed-in arguments except for the first argument:
-foreach i ( "`seq $#argv -1 2`" )
+if ( $#argv >= 2 ) then
+foreach i ( `seq $# -1 2` )
    #Within the t5 file, iteratively look for the $2, then the $3, etc.
    #If you find a match, create a new file t6, where the argument is replaced
    #by the actual argument value. 
-   cat t5 | awk '{ $0 = gensub(/(^|[^\\])\$'$i'/, "\\1'$argv[$i]'", "g"); print }' > t6
+   set rep = "$argv[$i]"
+   set rep = `printf "%s" "$rep" | sed 's/[\\&]/\\\\&/g'`
+    cat t5 | awk -v rep="$rep" -v idx="$i" '
+        {
+            pat = "(^|[^\\\\])\\$" idx
+            while (match($0, pat, m)) {
+                pre  = substr($0, 1, RSTART - 1)
+                post = substr($0, RSTART + RLENGTH)
+                $0 = pre m[1] rep post
+            }
+            print
+        }' > t6
    #Now move t6 back to t5, so that we are ready to set up the next argument.
    mv t6 t5
    #Since we're done processing this argument, remove it from argv, but not if
@@ -51,6 +63,7 @@ foreach i ( "`seq $#argv -1 2`" )
    #have a problem to overcome, when testing things that start with a "-").
    if ( X$argv[$i] !~ "X-*" ) set argv[$i] = ""
 end
+endif
 
 #Now we want to use almost every ";" into a line separation.
 #   A line separator? Yes: The ";" becomes "\n;"
@@ -60,10 +73,10 @@ end
 #We also want to get rid of the space added by line 8, above:
 #And we want to prevent any "\" that is itself backquoted (\\) from being used
 #to backquote anything else. This is handled by turning them into "\a"s. 
-cat t5 | awk '{gsub(/\\\\/, "\a"); if (NR==1) sub(/^./, ""); gsub(/\\;/, "\f"); gsub(/;/, "\n;"); print}' > t6
+cat t5 | awk '{gsub(/\\\\/, "\a"); if (NR==1) sub(/^ /, ""); gsub(/\\;/, "\f"); gsub(/;/, "\n;"); print}' > t6
 
 #Create an awk file from the part of this file below the exit:
-awk 'found{print} /^[[:space:]]*exit/{found=1}' < msed > t7
+awk '/^# *The rest of this file is awk code/{f=1;next} f' < msed > t7
 
 #Use the awk program created on line 35, above, in order to process the file
 #created on line 32 above (which, you will recall, is derived from argument 1,
@@ -95,7 +108,7 @@ while ( $i <= $nlines )
    #So now we take the single line $x and clean it up. The $-# will turn into
    #the number $z. Also to fix: make the branches used for "F" unique, by
    #adding a counter number to the end of whateven branch label may be in #x.
-   echo $x:q | awk '{gsub(/label7/, "label7" '$cnt'); sub(/\$-\\\\v[0-9]+/, '$z'); print}' >> t9
+   echo $x:q | awk '{gsub(/label7/, "label7" '$cnt'); gsub(/\$-\\\\v[0-9]+/, '$z'); print}' >> t9
 
    #Increase the counter used for the branch labels on line 63, above:
    @ cnt = $cnt + 1
@@ -135,7 +148,10 @@ exit 0
     if ($0 ~ /^[\\/]/) {
         delim = substr($0,1,1) == "\\" ? substr($0,2,1) : "/"
         tmp = $0
-        split(tmp, arr, delim)
+        delim_esc = delim
+        if (delim_esc ~ /[.\^$*+?()[{\\|]/)
+            delim_esc = "\\" delim_esc
+        split(tmp, arr, delim_esc)
         cnt = length(arr)-1
         while (cnt < 2) {
             if (getline nxt > 0) {
@@ -144,7 +160,10 @@ exit 0
                 else
                     $0 = $0 ";" nxt
                 tmp = $0
-                split(tmp, arr, delim)
+                delim_esc = delim
+                if (delim_esc ~ /[.\^$*+?()[{\\|]/)
+                    delim_esc = "\\" delim_esc
+                split(tmp, arr, delim_esc)
                 cnt = length(arr)-1
             } else
                 break
@@ -170,7 +189,10 @@ exit 0
         gsub(/^ */, "", rest)
         delim = substr(rest,1,1)
         tmp = rest
-        split(tmp, arr, delim)
+        delim_esc = delim
+        if (delim_esc ~ /[.\^$*+?()[{\\|]/)
+            delim_esc = "\\" delim_esc
+        split(tmp, arr, delim_esc)
         cnt = length(arr)-1
         while (cnt < 2) {
             if (getline nxt > 0) {
@@ -181,7 +203,10 @@ exit 0
                 rest = substr($0, pos+1)
                 gsub(/^ */, "", rest)
                 tmp = rest
-                split(tmp, arr, delim)
+                delim_esc = delim
+                if (delim_esc ~ /[.\^$*+?()[{\\|]/)
+                    delim_esc = "\\" delim_esc
+                split(tmp, arr, delim_esc)
                 cnt = length(arr)-1
             } else
                 break
@@ -191,10 +216,31 @@ exit 0
 
 #Now put a \v after whatever predication may be given (including none)
 {
-    $0 = gensub(/\\v(, *\/.*\/ *)/, "\\1\\v", 1)
-    $0 = gensub(/\\v(, *(.).*\\1 *)/, "\\1\\v", 1)
-    $0 = gensub(/\\v(, *[0-9]+ *)/, "\\1\\v", 1)
-    $0 = gensub(/\\v(, *\$ *)/, "\\1\\v", 1)
+    if (match($0, /\\v(, *\/.*\/ *)/)) {
+        pre = substr($0, 1, RSTART - 1)
+        mid = substr($0, RSTART + 2, RLENGTH - 2)
+        post = substr($0, RSTART + RLENGTH)
+        $0 = pre mid "\\v" post
+    } else if (match($0, /\\v, *\\(.)/, m)) {
+        d = m[1]
+        pat = "\\\\v(, *\\\\" d "[^" d "]*" d " *)"
+        if (match($0, pat)) {
+            pre = substr($0, 1, RSTART - 1)
+            mid = substr($0, RSTART + 2, RLENGTH - 2)
+            post = substr($0, RSTART + RLENGTH)
+            $0 = pre mid "\\v" post
+        }
+    } else if (match($0, /\\v(, *[0-9]+ *)/)) {
+        pre = substr($0, 1, RSTART - 1)
+        mid = substr($0, RSTART + 2, RLENGTH - 2)
+        post = substr($0, RSTART + RLENGTH)
+        $0 = pre mid "\\v" post
+    } else if (match($0, /\\v(, *\$ *)/)) {
+        pre = substr($0, 1, RSTART - 1)
+        mid = substr($0, RSTART + 2, RLENGTH - 2)
+        post = substr($0, RSTART + RLENGTH)
+        $0 = pre mid "\\v" post
+    }
     if ($0 !~ /\\v/)
         sub(/^ */, "&\\v")
 }
@@ -237,19 +283,48 @@ exit 0
 
 #Simple translations for the new commands Z, W, D, C, f, and F:
 {
-    if (sub(/^Z/, "s/.*//")) { print pro_line(); print; print epi_line(); next }
-    if (sub(/^W/, "s/.*//;g;s/.*//;G")) { print pro_line(); print; print epi_line(); next }
-    if (sub(/^D/, "h;d")) { print pro_line(); print; print epi_line(); next }
-    if (sub(/^C/, "H")) { print pro_line(); print; print epi_line(); next }
-    sub(/^f/, "t")
-    sub(/^F/, "T")
+    if (sub(/^[[:space:]]*Z/, "s/.*//")) {
+        split(guard_block(), gb, "\n")
+        print gb[1]
+        print
+        print gb[2]
+        next
+    }
+    if (sub(/^[[:space:]]*W/, "s/.*//;g;s/.*//;G")) {
+        split(guard_block(), gb, "\n")
+        print gb[1]
+        print
+        print gb[2]
+        next
+    }
+    if (sub(/^[[:space:]]*D/, "x; s/.*//; x; d")) {
+        split(guard_block(), gb, "\n")
+        print gb[1]
+        print
+        print gb[2]
+        next
+    }
+    if (sub(/^[[:space:]]*C/, "H; x; s/\\r\\v$//; x")) {
+        split(guard_block(), gb, "\n")
+        print gb[1]
+        print
+        print gb[2]
+        next
+    }
+    sub(/^[[:space:]]*f/, "s/^//")
+    if (sub(/^[[:space:]]*F/, "tlabel7;:label7")) {
+        split(guard_block(), gb, "\n")
+        print gb[1]
+        print
+        print gb[2]
+        next
+    }
 }
 
 #These add an unusual symbol ("\v", which doesn't occur in the input) to mark
 #out the $-#, so that line 63 above can find them and convert them:
 {
-    sub(/^\$-/, "&\\\\v")
-    gsub(/, *\$-/, "&\\\\v")
+    gsub(/\$-[0-9]+/, "&\\v")
 }
 
 #These clean up the backquotes:
@@ -257,17 +332,13 @@ BEGIN {
     flcnt=0
 }
 
-function pro_line() {
+function guard_block(  plabel, elabel, pre, post) {
     flcnt++
-    plabel="flagL1" flcnt
-    elabel="flagL2" flcnt
-    pro_val="T" plabel "; x; s/$/\\r\\v/; x; :" plabel
-    epi_val="T" elabel "; :" elabel "; x; s/\\r\\v$//; x"
-    return pro_val
-}
-
-function epi_line() {
-    return epi_val
+    plabel="flagL" flcnt "_a"
+    elabel="flagL" flcnt "_b"
+    pre="T" plabel "; x; s/$/\\r\\v/; x; :" plabel
+    post="T" elabel "; :" elabel "; x; s/\\r\\v$//; x"
+    return pre "\n" post
 }
 
 {
@@ -276,7 +347,14 @@ function epi_line() {
     n = split($0, lines, "\n")
     for (i = 1; i <= n; i++) {
         line = lines[i]
-        print line
+        if (line ~ /(^|[^\\0-9A-Za-z])s[^0-9A-Za-z]/) {
+            split(guard_block(), gb, "\n")
+            print gb[1]
+            print line
+            print gb[2]
+        } else {
+            print line
+        }
     }
 }
 
