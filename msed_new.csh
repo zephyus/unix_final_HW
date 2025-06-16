@@ -138,25 +138,45 @@ exit 0
 
 #Now we consider ", /.../" or ", \x...x" since these can have ;
 #Step 1 is to mark off the part that might go before the , by using a \v
-________
-   .
-   .
-   .
-________
+{
+    if ($0 ~ /^\/.*\/[ \t]*/) sub(/^\/.*\/[ \t]*/, "&\\v")
+    if ($0 ~ /^\\(.\\).*\\1[ \t]*/) sub(/^\\(.\\).*\\1[ \t]*/, "&\\v")
+    if ($0 ~ /^[0-9]+[ \t]*/) sub(/^[0-9]+[ \t]*/, "&\\v")
+    if ($0 ~ /^\$[ \t]*/) sub(/^\$[ \t]*/, "&\\v")
+
+    if ($0 ~ /\\v, *[\\/]/) {
+        while ($0 !~ /\\v, *\/.*\// && !match($0, /\\v, *\\(.\\).*\\1/)) {
+            if (getline nxt > 0)
+                $0 = $0 ";" nxt
+            else
+                break
+        }
+    }
+}
 
 #Now put a \v after whatever predication may be given (including none)
-________
-   .
-   .
-   .
-________
+{
+    sub(/\\v(, *\/.*\/ *)/, "\\1\\v")
+    sub(/\\v(, *\\(.\\).*\\1 *)/, "\\1\\v")
+    sub(/\\v(, *[0-9]+ *)/, "\\1\\v")
+    sub(/\\v(, *\$ *)/, "\\1\\v")
+    if ($0 !~ /\\v/)
+        sub(/^ */, "&\\v")
+}
 
 #Now deal with y and s comands that might use ";"
-________
-   .
-   .
-   .
-________
+{
+    if ($0 ~ /^\\v[ys]/) {
+        while ($0 !~ /^\\v[ys](.).*\\1.*\\1/) {
+            if (getline nxt > 0)
+                $0 = $0 ";" nxt
+            else
+                break
+        }
+    }
+    sub(/^;/, "")
+    sub(/\\v/, "")
+}
 
 #
 #So now we have whole sed commands on lines. By I am adding a new part here:
@@ -171,24 +191,27 @@ ________
 #msed program is using. (That is: you saw how my solution on the last homework
 #had logic to keep your code from breaking the hold space or the flag state;
 #this homework must retain that.)
-________
-   .
-   .
-   .
-________
+{
+    sub(/^Z/, "s/[^\\n]\\n\\{,1\\}//")
+    if (match($0, /^W(.*)/, m))
+        $0 = "{ s/^/\\v/\n H\n s/.//\n s/\\n.*//\n w" m[1] "\n g\n s/\\v.*//\n x\n s/.*\\v//\n}"
+    sub(/^D$/, "{/\\n/!s/$/\\n/;D;}")
+    if (match($0, /^C(.*)/, m))
+        $0 = "s/.*/" m[1] "/"
+    sub(/^f$/, "s/^//")
+    sub(/^F$/, "tlabel7;:label7")
+}
 
 #These add an unusual symbol ("\v", which doesn't occur in the input) to mark
 #out the $-#, so that line 63 above can find them and convert them:
-________
-   .
-   .
-   .
-________
+{
+    sub(/^\$-/, "&\\v")
+    gsub(/, *\$-/, "&\\v")
+}
 
 #These clean up the backquotes:
-________
-   .
-   .
-   .
-________
+{
+    gsub(/\f/, "\\;")
+    gsub(/\a/, "\\\\")
+}
 
