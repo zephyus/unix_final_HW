@@ -85,13 +85,12 @@ cat t6 | awk -ft7 > t8
 
 #Here are some initializations to set up the foreach loop that will follow:
 rm -f t9
-@ cnt = 0
 @ z = 0
 set nonomatch
 set noglob
 
 #Go through the version of sed commands stored in t8 (created from Line 40
-#above), to see if any of the commands used a $-# syntax or a "f" or "F":
+#above), to see if any of the commands used a $-# syntax:
 @ i = 1
 @ nlines = `cat t8 | wc -l`
 while ( $i <= $nlines )
@@ -106,12 +105,8 @@ while ( $i <= $nlines )
    if ( X$y != X ) @ z = `cat t4 | wc -l` - $y
 
    #So now we take the single line $x and clean it up. The $-# will turn into
-   #the number $z. Also to fix: make the branches used for "F" unique, by
-   #adding a counter number to the end of whateven branch label may be in #x.
-   echo $x:q | awk '{gsub(/label7/, "label7" '$cnt'); gsub(/\$-\\\\v[0-9]+/, '$z'); print}' >> t9
-
-   #Increase the counter used for the branch labels on line 63, above:
-   @ cnt = $cnt + 1
+   #the number $z.
+   echo $x:q | awk '{gsub(/\$-\\\\v[0-9]+/, '$z'); print}' >> t9
    @ i++
 end
 
@@ -311,13 +306,12 @@ exit 0
         print gb[2]
         next
     }
-    sub(/^[[:space:]]*f/, "s/^//")
-    if (sub(/^[[:space:]]*F/, "tlabel7;:label7")) {
-        split(guard_block(), gb, "\n")
-        print gb[1]
-        print
-        print gb[2]
-        next
+    if (match($0, /^[[:space:]]*f[ \t]+([A-Za-z0-9_]+)/, m)) {
+        lbl = m[1]
+        sub(/^[[:space:]]*f[ \t]+[A-Za-z0-9_]+/, "x; /\\r\\v$/!b " lbl "; x")
+    } else if (match($0, /^[[:space:]]*F[ \t]+([A-Za-z0-9_]+)/, m)) {
+        lbl = m[1]
+        sub(/^[[:space:]]*F[ \t]+[A-Za-z0-9_]+/, "x; /\\r\\v$/b " lbl "; x")
     }
 }
 
