@@ -125,11 +125,16 @@ exit 0
 #      for i, a, c, C, w, W, r.
 
 #This section combines lines to form /.../ or \x...x -- if there are ; in it:
-________
-   .
-   .
-   .
-________
+{
+    if ($0 ~ /^[\\/]/) {
+        while ($0 !~ /^\/.*\/$/ && !match($0, /^\\(.\\).*\\1/)) {
+            if (getline nxt > 0)
+                $0 = $0 ";" nxt
+            else
+                break
+        }
+    }
+}
 
 #Now we consider ", /.../" or ", \x...x" since these can have ;
 #Step 1 is to mark off the part that might go before the , by using a \v
