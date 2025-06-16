@@ -40,7 +40,7 @@ echo \ $1:q > t5
 
 #Loop through all of the passed-in arguments except for the first argument:
 if ( $#argv >= 2 ) then
-foreach i ( "`seq $#argv -1 2`" )
+foreach i ( `seq $#argv -1 2` )
    #Within the t5 file, iteratively look for the $2, then the $3, etc.
    #If you find a match, create a new file t6, where the argument is replaced
    #by the actual argument value. 
@@ -245,10 +245,34 @@ exit 0
 
 #Simple translations for the new commands Z, W, D, C, f, and F:
 {
-    if (sub(/^[[:space:]]*Z/, "s/.*//")) { print pro_line(); print; print epi_line(); next }
-    if (sub(/^[[:space:]]*W/, "s/.*//;g;s/.*//;G")) { print pro_line(); print; print epi_line(); next }
-    if (sub(/^[[:space:]]*D/, "h;d")) { print pro_line(); print; print epi_line(); next }
-    if (sub(/^[[:space:]]*C/, "H")) { print pro_line(); print; print epi_line(); next }
+    if (sub(/^[[:space:]]*Z/, "s/.*//")) {
+        split(guard_block(), gb, "\n")
+        print gb[1]
+        print
+        print gb[2]
+        next
+    }
+    if (sub(/^[[:space:]]*W/, "s/.*//;g;s/.*//;G")) {
+        split(guard_block(), gb, "\n")
+        print gb[1]
+        print
+        print gb[2]
+        next
+    }
+    if (sub(/^[[:space:]]*D/, "h;d")) {
+        split(guard_block(), gb, "\n")
+        print gb[1]
+        print
+        print gb[2]
+        next
+    }
+    if (sub(/^[[:space:]]*C/, "H")) {
+        split(guard_block(), gb, "\n")
+        print gb[1]
+        print
+        print gb[2]
+        next
+    }
     sub(/^[[:space:]]*f/, "t")
     sub(/^[[:space:]]*F/, "Tlabel7;:label7")
 }
@@ -265,17 +289,13 @@ BEGIN {
     flcnt=0
 }
 
-function pro_line() {
+function guard_block(  plabel, elabel, pre, post) {
     flcnt++
-    plabel="flagL1" flcnt
-    elabel="flagL2" flcnt
-    pro_val="T" plabel "; x; s/$/\\r\\v/; x; :" plabel
-    epi_val="T" elabel "; :" elabel "; x; s/\\r\\v$//; x"
-    return pro_val
-}
-
-function epi_line() {
-    return epi_val
+    plabel="flagL" flcnt "_a"
+    elabel="flagL" flcnt "_b"
+    pre="T" plabel "; x; s/$/\\r\\v/; x; :" plabel
+    post="T" elabel "; :" elabel "; x; s/\\r\\v$//; x"
+    return pre "\n" post
 }
 
 {
@@ -285,9 +305,10 @@ function epi_line() {
     for (i = 1; i <= n; i++) {
         line = lines[i]
         if (line ~ /^[^[:alpha:]]*s[^[:alnum:]]/) {
-            print pro_line()
+            split(guard_block(), gb, "\n")
+            print gb[1]
             print line
-            print epi_line()
+            print gb[2]
         } else {
             print line
         }
