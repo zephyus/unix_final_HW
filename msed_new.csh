@@ -103,7 +103,7 @@ cat t6 | awk -ft7 > t8
 
 #Here are some initializations to set up the foreach loop that will follow:
 rm -f t9
-@ z = 0
+@ total_lines = `cat t4 | wc -l`
 set nonomatch
 set noglob
 
@@ -114,17 +114,8 @@ set noglob
 while ( $i <= $nlines )
    set x = `sed -n "$i"p t8`
    #Here, x is a single line from t8, so it is usually a single sed command.
-   #Now we want to make a variable y that will be the number # of any $-# that
-   #might be on this line x. (Let y be "" otherwise.):
-   set y = `echo $x:q | awk '{if(match($0,/\$-\\\\v([0-9]+)/,m))print m[1]}'`
-
-   #So now, what if $y==a number? Well that means that we need to work out
-   #what line number would match to $#-1? Set z to that line number:
-   if ( X$y != X ) @ z = `cat t4 | wc -l` - $y
-
-   #So now we take the single line $x and clean it up. The $-# will turn into
-   #the number $z.
-   echo $x:q | awk '{gsub(/\$-\\\\v[0-9]+/, '$z'); print}' >> t9
+   #Replace all $-# occurrences based on the input length.
+   echo $x:q | awk -v tot="$total_lines" '{while (match($0, /\$-\\v([0-9]+)/, m)) {off=m[1]; sub("\\$-\\v" off, tot - off)} print}' >> t9
    @ i++
 end
 
@@ -363,22 +354,19 @@ function guard_block(  plabel, elabel, pre, post) {
     return pre "\n" post
 }
 
-function rename_labels(line,    k, mat, pre, post) {
+function rename_labels(line,    k, mat, pre, post, cmd, ws) {
     for (k in fmap) {
         while (match(line, ":" k "([^A-Za-z0-9_]|$)", mat)) {
             pre  = substr(line, 1, RSTART-1)
             post = substr(line, RSTART+RLENGTH)
             line = pre ":" fmap[k] mat[1] post
         }
-        while (match(line, "b[ \t]+" k "([^A-Za-z0-9_]|$)", mat)) {
+        while (match(line, "([bBtT])([ \t]*)" k "([^A-Za-z0-9_]|$)", mat)) {
             pre  = substr(line, 1, RSTART-1)
             post = substr(line, RSTART+RLENGTH)
-            line = pre "b " fmap[k] mat[1] post
-        }
-        while (match(line, "t[ \t]+" k "([^A-Za-z0-9_]|$)", mat)) {
-            pre  = substr(line, 1, RSTART-1)
-            post = substr(line, RSTART+RLENGTH)
-            line = pre "t " fmap[k] mat[1] post
+            cmd = mat[1]
+            ws  = mat[2]
+            line = pre cmd ws fmap[k] mat[3] post
         }
     }
     return line
@@ -393,8 +381,8 @@ function rename_labels(line,    k, mat, pre, post) {
         line = lines[i]
         trimmed = line
         sub(/^[ \t]*/, "", trimmed)
-        if (trimmed ~ /(^|[,0-9$\/\\])s[^0-9A-Za-z]/ ||
-            trimmed ~ /(^|[,0-9$\/\\])y[^0-9A-Za-z]/) {
+        if (trimmed ~ /(^|[ ,0-9$\/\\])s[ \t]*[^0-9A-Za-z]/ ||
+            trimmed ~ /(^|[ ,0-9$\/\\])y[ \t]*[^0-9A-Za-z]/) {
             split(guard_block(), gb, "\n")
             print rename_labels(gb[1])
             print rename_labels(line)
