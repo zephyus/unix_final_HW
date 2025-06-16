@@ -344,11 +344,23 @@ function guard_block(  plabel, elabel, pre, post) {
     return pre "\n" post
 }
 
-function rename_labels(line,    k) {
+function rename_labels(line,    k, mat, pre, post) {
     for (k in fmap) {
-        gsub(":" k "([^A-Za-z0-9_]|$)", ":" fmap[k] "\\1", line)
-        gsub("b[ \t]+" k "([^A-Za-z0-9_]|$)", "b " fmap[k] "\\1", line)
-        gsub("t[ \t]+" k "([^A-Za-z0-9_]|$)", "t " fmap[k] "\\1", line)
+        while (match(line, ":" k "([^A-Za-z0-9_]|$)", mat)) {
+            pre  = substr(line, 1, RSTART-1)
+            post = substr(line, RSTART+RLENGTH)
+            line = pre ":" fmap[k] mat[1] post
+        }
+        while (match(line, "b[ \t]+" k "([^A-Za-z0-9_]|$)", mat)) {
+            pre  = substr(line, 1, RSTART-1)
+            post = substr(line, RSTART+RLENGTH)
+            line = pre "b " fmap[k] mat[1] post
+        }
+        while (match(line, "t[ \t]+" k "([^A-Za-z0-9_]|$)", mat)) {
+            pre  = substr(line, 1, RSTART-1)
+            post = substr(line, RSTART+RLENGTH)
+            line = pre "t " fmap[k] mat[1] post
+        }
     }
     return line
 }
