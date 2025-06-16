@@ -250,9 +250,28 @@ exit 0
 }
 
 #These clean up the backquotes:
+BEGIN {
+    pro="TflagL1; x; s/$/\\r\\v/; x; :flagL1"
+    epi="TflagL2; :flagL2; x; s/\\r\\v$//; x"
+}
+
 {
     gsub(/\f/, "\\;")
     gsub(/\a/, "\\\\")
-    print
+    n = split($0, lines, "\n")
+    for (i = 1; i <= n; i++) {
+        line = lines[i]
+        if (line ~ /^\s*[^{#].*$/) {
+            tmp = line
+            sub(/^\s*/, "", tmp)
+            if (tmp ~ /^s[^A-Za-z0-9]/) {
+                print pro
+                print line
+                print epi
+                continue
+            }
+        }
+        print line
+    }
 }
 
