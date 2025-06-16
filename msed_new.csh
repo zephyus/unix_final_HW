@@ -74,6 +74,7 @@ cat t6 | awk -ft7 > t8
 rm -f t9
 @ cnt = 0
 @ z = 0
+set nonomatch
 
 #Go through the version of sed commands stored in t8 (created from Line 40
 #above), to see if any of the commands used a $-# syntax or a "f" or "F":
@@ -81,7 +82,7 @@ foreach x ( `cat t8`)
    #Here, x is a single line from t8, so it is usually a single sed command.
    #Now we want to make a variable y that will be the number # of any $-# that
    #might be on this line x. (Let y be "" otherwise.):
-    set y = `echo $x:q | awk '{if(match($0,/\$-\\v([0-9]+)/,m))print m[1]}'`
+   set y = `echo $x:q | awk '{if(match($0,/\$-\\\\v([0-9]+)/,m))print m[1]}'`
 
    #So now, what if $y==a number? Well that means that we need to work out
    #what line number would match to $#-1? Set z to that line number:
@@ -90,7 +91,7 @@ foreach x ( `cat t8`)
    #So now we take the single line $x and clean it up. The $-# will turn into
    #the number $z. Also to fix: make the branches used for "F" unique, by
    #adding a counter number to the end of whateven branch label may be in #x.
-   echo $x:q | awk '{gsub(/label7/, "label7" '$cnt'); gsub(/\$-\\v[0-9]+/, '$z'); print}' >> t9
+   echo $x:q | awk '{gsub(/label7/, "label7" '$cnt'); gsub(/\$-\\\\v[0-9]+/, '$z'); print}' >> t9
 
    #Increase the counter used for the branch labels on line 63, above:
    @ cnt = $cnt + 1
@@ -127,13 +128,20 @@ exit 0
 #This section combines lines to form /.../ or \x...x -- if there are ; in it:
 {
     if ($0 ~ /^[\\/]/) {
-        while ($0 !~ /^\/.*\/$/ && !match($0, /^\\(.\\).*\\1/)) {
-            if (getline nxt > 0)
+        delim = substr($0,1,1) == "\\" ? substr($0,2,1) : "/"
+        tmp = $0
+        split(tmp, arr, delim)
+        cnt = length(arr)-1
+        while (cnt < 2) {
+            if (getline nxt > 0) {
                 if (nxt ~ /^;/)
                     $0 = $0 nxt
                 else
                     $0 = $0 ";" nxt
-            else
+                tmp = $0
+                split(tmp, arr, delim)
+                cnt = length(arr)-1
+            } else
                 break
         }
     }
@@ -143,18 +151,34 @@ exit 0
 #Step 1 is to mark off the part that might go before the , by using a \v
 {
     if ($0 ~ /^\/.*\/[ \t]*/) sub(/^\/.*\/[ \t]*/, "&\\v")
-    if ($0 ~ /^\\(.\\).*\\1[ \t]*/) sub(/^\\(.\\).*\\1[ \t]*/, "&\\v")
+    if ($0 ~ /^\\/) {
+        d = substr($0,2,1)
+        if (match($0, "^\\" d ".*" d "[ \t]*"))
+            $0 = substr($0,1,RLENGTH) "\\\\v" substr($0,RLENGTH+1)
+    }
     if ($0 ~ /^[0-9]+[ \t]*/) sub(/^[0-9]+[ \t]*/, "&\\v")
     if ($0 ~ /^\$[ \t]*/) sub(/^\$[ \t]*/, "&\\v")
 
     if ($0 ~ /\\v, *[\\/]/) {
-        while ($0 !~ /\\v, *\/.*\// && !match($0, /\\v, *\\(.\\).*\\1/)) {
-            if (getline nxt > 0)
+        pos = index($0, ",")
+        rest = substr($0, pos+1)
+        gsub(/^ */, "", rest)
+        delim = substr(rest,1,1)
+        tmp = rest
+        split(tmp, arr, delim)
+        cnt = length(arr)-1
+        while (cnt < 2) {
+            if (getline nxt > 0) {
                 if (nxt ~ /^;/)
                     $0 = $0 nxt
                 else
                     $0 = $0 ";" nxt
-            else
+                rest = substr($0, pos+1)
+                gsub(/^ */, "", rest)
+                tmp = rest
+                split(tmp, arr, delim)
+                cnt = length(arr)-1
+            } else
                 break
         }
     }
@@ -162,10 +186,10 @@ exit 0
 
 #Now put a \v after whatever predication may be given (including none)
 {
-    sub(/\\v(, *\/.*\/ *)/, "\\1\\v")
-    sub(/\\v(, *\\(.\\).*\\1 *)/, "\\1\\v")
-    sub(/\\v(, *[0-9]+ *)/, "\\1\\v")
-    sub(/\\v(, *\$ *)/, "\\1\\v")
+    $0 = gensub(/\\v(, *\/.*\/ *)/, "\\1\\\\v", 1)
+    $0 = gensub(/\\v(, *\\(.\\).*\\1 *)/, "\\1\\\\v", 1)
+    $0 = gensub(/\\v(, *[0-9]+ *)/, "\\1\\\\v", 1)
+    $0 = gensub(/\\v(, *\$ *)/, "\\1\\\\v", 1)
     if ($0 !~ /\\v/)
         sub(/^ */, "&\\v")
 }
@@ -173,7 +197,9 @@ exit 0
 #Now deal with y and s comands that might use ";"
 {
     if ($0 ~ /^\\v[ys]/) {
-        while ($0 !~ /^\\v[ys](.).*\\1.*\\1/) {
+        delim = substr($0,3,1)
+        pattern = "^\\v[ys]" delim ".*" delim ".*" delim
+        while ($0 !~ pattern) {
             if (getline nxt > 0)
                 if (nxt ~ /^;/)
                     $0 = $0 nxt
@@ -214,8 +240,8 @@ exit 0
 #These add an unusual symbol ("\v", which doesn't occur in the input) to mark
 #out the $-#, so that line 63 above can find them and convert them:
 {
-    sub(/^\$-/, "&\\v")
-    gsub(/, *\$-/, "&\\v")
+    sub(/^\$-/, "&\\\\v")
+    gsub(/, *\$-/, "&\\\\v")
 }
 
 #These clean up the backquotes:
