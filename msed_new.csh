@@ -216,6 +216,7 @@ exit 0
     }
     sub(/^;/, "")
     sub(/\\v/, "")
+    sub(/^;/, "")
 }
 
 #
@@ -238,8 +239,8 @@ exit 0
     sub(/^D$/, "{/\\n/!s/$/\\n/;D;}")
     if (match($0, /^C(.*)/, m))
         $0 = "s/.*/" m[1] "/"
-    sub(/^f$/, "s/^//")
-    sub(/^F$/, "tlabel7;:label7")
+    $0 = gensub(/(^|;)f(;|$)/, "\\1s/^//\\2", "g")
+    $0 = gensub(/(^|;)F(;|$)/, "\\1tlabel7;:label7\\2", "g")
 }
 
 #These add an unusual symbol ("\v", which doesn't occur in the input) to mark
@@ -264,7 +265,7 @@ BEGIN {
         if (line ~ /^\s*[^{#].*$/) {
             tmp = line
             sub(/^\s*/, "", tmp)
-            if (tmp ~ /^s[^A-Za-z0-9]/) {
+            if (tmp ~ /^s[^A-Za-z0-9]/ && tmp != "s/^//") {
                 print pro
                 print line
                 print epi
