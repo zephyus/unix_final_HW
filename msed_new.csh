@@ -43,7 +43,7 @@ foreach i ( "`seq $# -1 2`" )
    #Within the t5 file, iteratively look for the $2, then the $3, etc.
    #If you find a match, create a new file t6, where the argument is replaced
    #by the actual argument value. 
-   cat t5 | awk '_________' > t6
+   cat t5 | awk '{while(match($0,/([^\\])\$'$i'/)){ $0=substr($0,1,RSTART-1) substr($0,RSTART,1) "'$argv[$i]'" substr($0,RSTART+RLENGTH); } print }' > t6
    #Now move t6 back to t5, so that we are ready to set up the next argument.
    mv t6 t5
    #Since we're done processing this argument, remove it from argv, but not if
@@ -60,10 +60,10 @@ end
 #We also want to get rid of the space added by line 8, above:
 #And we want to prevent any "\" that is itself backquoted (\\) from being used
 #to backquote anything else. This is handled by turning them into "\a"s. 
-cat t5 | awk '_______' > t6
+cat t5 | awk '{gsub(/\\\\/, "\a"); sub(/^./, ""); gsub(/\\;/, "\f"); gsub(/;/, "\n;"); print}' > t6
 
 #Create an awk file from the part of this file below the exit:
-awk ______ < msed > t7
+awk 'found{print} /^exit/{found=1}' < msed > t7
 
 #Use the awk program created on line 35, above, in order to process the file
 #created on line 32 above (which, you will recall, is derived from argument 1,
@@ -81,7 +81,7 @@ foreach x ( `cat t8`)
    #Here, x is a single line from t8, so it is usually a single sed command.
    #Now we want to make a variable y that will be the number # of any $-# that
    #might be on this line x. (Let y be "" otherwise.):
-   set y = `echo $x:q | awk '_______________'`
+    set y = `echo $x:q | awk '{if(match($0,/\$-\\v([0-9]+)/,m))print m[1]}'`
 
    #So now, what if $y==a number? Well that means that we need to work out
    #what line number would match to $#-1? Set z to that line number:
