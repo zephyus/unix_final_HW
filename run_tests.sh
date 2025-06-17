@@ -8,11 +8,12 @@ run_test() {
     args="$3"
     input="$4"
     expected="$5"
+    expected_exp=$(printf '%b' "$expected")
     out=$(printf '%b' "$input" | ./msed_new.csh "$script" $args 2>/dev/null)
-    if [ "$out" = "$expected" ]; then
+    if [ "$out" = "$expected_exp" ]; then
         echo "Test $num PASS"
     else
-        echo "Test $num FAIL: expected [$expected], got [$out]"
+        echo "Test $num FAIL: expected [$expected_exp], got [$out]"
         fail=1
     fi
 }
