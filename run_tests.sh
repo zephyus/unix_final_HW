@@ -47,3 +47,19 @@ run_test 18 '{\n= }' "" 'abc\n' '1\nabc\n'
 
 run_test 19 '1,2Z' "" 'a\nb\nc\n' '\n\nc\n'
 run_test 20 '1Wtmp.txt' "" 'line1\nline2\n' '\n\nline2\n'
+
+run_test 20 '1Wtmp.txt' "" 'line1\nline2\n' 'line2'
+run_test 21 '/start/,/end/ D' "" 'start\nfoo bar\nend\n' 'foo bar'
+run_test 22 'C REPLACED' "" 'orig\ntext\n' 'REPLACED'
+run_test 23 'f a' "" 'foo\nbar\n' ''
+run_test 24 'F' "" 'text\n' 'stdin'
+
+run_test 25 's/x/y/; tx; b; :x p' "" 'x\n' 'y'
+run_test 26 'F; :loop n; bloop' "" 'a\n' ''
+
+run_test 27 '$-1{ y;az;AZ; }' "" 'a\nb\nc\n' 'a\nb\nC'
+run_test 28 '2,$-0d' "" '1\n2\n3\n' '1'
+
+run_test 29 's/x/X/; h; g' "" 'x\n' 'X'
+run_test 30 'h; s/./@/; x' "" 'abc\n' 'abc'
+
