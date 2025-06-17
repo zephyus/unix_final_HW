@@ -296,8 +296,8 @@ exit 0
 
 #Simple translations for the new commands Z, W, D, C, f, and F:
 {
-    if ($0 ~ /^[[:space:]]*Z([[:space:]]|$)/) {
-        sub(/^[[:space:]]*Z.*$/, "s/.*//")
+    if ($0 ~ /(^|[ ,0-9$\/\\])Z([[:space:]]|$)/) {
+        sub(/[[:space:]]*Z[[:space:]]*$/, "s/.*//")
         split(guard_block(), gb, "\n")
         print rename_labels(gb[1])
         print rename_labels($0)
@@ -311,19 +311,19 @@ exit 0
         print rename_labels(gb[2])
         next
     }
-    if ($0 ~ /^[[:space:]]*D([[:space:]]|$)/) {
+    if ($0 ~ /(^|[ ,0-9$\/\\])D([[:space:]]|$)/) {
         split(guard_block(), gb, "\n")
         print rename_labels(gb[1])
-        sub(/^[[:space:]]*D[ \t]*/, "")
+        sub(/[[:space:]]*D[ \t]*$/, "")
         $0 = "x; s/.*//; x; d"
         print rename_labels($0)
         print rename_labels(gb[2])
         next
     }
-    if ($0 ~ /^[[:space:]]*C([[:space:]]|$)/) {
+    if ($0 ~ /(^|[ ,0-9$\/\\])C([[:space:]]|$)/) {
         split(guard_block(), gb, "\n")
         print rename_labels(gb[1])
-        sub(/^[[:space:]]*C[ \t]*/, "")
+        sub(/^[^C]*C[ \t]*/, "")
         rep = $0
         gsub(/[\\&]/, "\\\\&", rep)
         $0 = "s/.*/" rep "/"
