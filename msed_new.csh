@@ -104,7 +104,7 @@ else
 endif
 
 #Line 3 had captured the piped-in input into t4. So we now process it:
-cat t4 | sed $*:q | awk '{out = (NR==1 ? $0 : out "\\n" $0)} END {if(NR>0) printf "%s", out}'
+cat t4 | sed $*:q
 
 #And now we are done with cshell:
 exit 0
@@ -368,10 +368,6 @@ function rename_labels(line,    k, mat, pre, post, cmd, ws) {
             print rename_labels(line)
             print rename_labels(gb[2])
         } else {
-            tmp = trimmed
-            sub(/[ \t]*$/, "", tmp)
-            if (tmp ~ /p$/ && tmp !~ /s.*p$/ && tmp !~ /y.*p$/)
-                line = line ";d"
             print rename_labels(line)
         }
     }
