@@ -31,3 +31,18 @@ run_test 9 '$-0 s/.*/LAST/' "" 'a\nb\n' 'a\nLAST'
 
 run_test 10 's/x/X/;s/y/Y/' "" 'x y\n' 'X Y'
 
+
+run_test 11 's;\\;;SEMICOLON;;' "" 'a;b;c\n' 'aSEMICOLONb;c'
+run_test 12 's/\\;/#/g' "" '\\;foo\n' '#foo'
+
+run_test 13 's/foo/FOO/pg' "" 'foo\n' 'FOO'
+run_test 14 'y;abc;ABC;' "" 'cab\n' 'CAB'
+
+run_test 15 's/\\\\/SLASH/g' "" '\\ path\n' 'SLASH path'
+run_test 16 's/\\n/NL/; s/\\\\n/DBL/' "" '\n \\n\n' 'NL DBL'
+
+run_test 17 '/start/,/end/{ s/x/X/; p }' "" 'start\nx\nend\n' 'X'
+run_test 18 '{\n= }' "" 'abc\n' '1\nabc'
+
+run_test 19 '1,2Z' "" 'a\nb\nc\n' 'c'
+run_test 20 '1Wtmp.txt' "" 'line1\nline2\n' 'line2'
