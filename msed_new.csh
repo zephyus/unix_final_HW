@@ -127,6 +127,14 @@ exit 0
 #Note: In our new version of sed, we like the fact that ";" will cause breaks
 #      for i, a, c, C, w, W, r.
 
+#Mark any $-# usage so that later the csh layer can convert it to a real line
+#number. This must happen before we start splitting commands on "{" or handling
+#y/s command merging so that the marker stays with the address portion.
+{
+    while (match($0, /\$-([0-9]+)/, m))
+        $0 = substr($0, 1, RSTART+1) "\v" m[1] substr($0, RSTART + RLENGTH)
+}
+
 #This section combines lines to form /.../ or \x...x -- if there are ; in it:
 {
     if ($0 ~ /^[\\/]/) {
@@ -262,12 +270,34 @@ exit 0
         pos = index($0, "{")
         print substr($0, 1, pos)
         $0 = substr($0, pos+1)
+        sub(/^ */, "", $0)
+        if (length($0))
+            $0 = "\v" $0
+        if ($0 ~ /^\v[ys]/) {
+            delim = substr($0,3,1)
+            if (delim == "" && getline nxt > 0) {
+                if (nxt ~ /^;/)
+                    $0 = $0 nxt
+                else
+                    $0 = $0 ";" nxt
+                delim = substr($0,3,1)
+            }
+            tmp = $0; cnt = gsub(delim, "", tmp)
+            while (cnt < 3 && getline nxt > 0) {
+                if (nxt ~ /^;/)
+                    $0 = $0 nxt
+                else
+                    $0 = $0 ";" nxt
+                tmp = nxt; cnt += gsub(delim, "", tmp)
+            }
+        }
     }
 }
 
 #Simple translations for the new commands Z, W, D, C, f, and F:
 {
-    if (sub(/Z.*$/, "s/.*//")) {
+    if ($0 ~ /^[[:space:]]*Z([[:space:]]|$)/) {
+        sub(/^[[:space:]]*Z.*$/, "s/.*//")
         split(guard_block(), gb, "\n")
         print rename_labels(gb[1])
         print rename_labels($0)
@@ -294,14 +324,15 @@ exit 0
         split(guard_block(), gb, "\n")
         print rename_labels(gb[1])
         sub(/^[[:space:]]*C[ \t]*/, "")
-        $0 = "H; x; s/\\r\\v$//; x"
+        rep = $0
+        gsub(/[\\&]/, "\\\\&", rep)
+        $0 = "s/.*/" rep "/"
         print rename_labels($0)
         print rename_labels(gb[2])
         next
     }
     if (match($0, /^[[:space:]]*f[ \t]+([A-Za-z0-9_]+)/, m)) {
-        lbl = m[1]
-        sub(/^[[:space:]]*f[ \t]+[A-Za-z0-9_]+/, "x; /\\r\\v$/!b " lbl "; x")
+        $0 = "s/^//"
     } else if (match($0, /^[[:space:]]*F[ \t]+([A-Za-z0-9_]+)/, m)) {
         orig = m[1]
         lbl = orig "_" fcnt
@@ -311,12 +342,7 @@ exit 0
     }
 }
 
-#These add an unusual symbol ("\v", which doesn't occur in the input) to mark
-#out the $-#, so that line 63 above can find them and convert them:
-{
-    while (match($0, /\$-([0-9]+)/, m))
-        $0 = substr($0, 1, RSTART+1) "\v" m[1] substr($0, RSTART + RLENGTH)
-}
+
 
 #These clean up the backquotes:
 BEGIN {
