@@ -93,15 +93,7 @@ rm -f t9
 
 #Go through the version of sed commands stored in t8 (created from Line 40
 #above), to see if any of the commands used a $-# syntax:
-@ i = 1
-@ nlines = `cat t8 | wc -l`
-while ( $i <= $nlines )
-   set x = `sed -n "$i"p t8`
-   #Here, x is a single line from t8, so it is usually a single sed command.
-   #Replace all $-# occurrences based on the input length.
-   echo $x:q | awk -v tot="$total_lines" '{while (match($0, /\$-\\v([0-9]+)/, m)) {off=m[1]; sub("\\$-\\v" off, tot - off)} print}' >> t9
-   @ i++
-end
+cat t8 | awk -v tot="$total_lines" '{while (match($0, /\$-\v([0-9]+)/, m)) {off=m[1]; sub("\\$-\\v" m[1], tot - off)} print}' > t9
 
 #Line 62 above created t9, the ordinary sed implementation of the original
 #program the user had provided in $1. So we replace $1 with t9:
@@ -112,7 +104,7 @@ else
 endif
 
 #Line 3 had captured the piped-in input into t4. So we now process it:
-cat t4 | sed $*:q
+cat t4 | sed $*:q | awk '{out = (NR==1 ? $0 : out "\\n" $0)} END {if(NR>0) printf "%s", out}'
 
 #And now we are done with cshell:
 exit 0
@@ -323,7 +315,7 @@ exit 0
 #out the $-#, so that line 63 above can find them and convert them:
 {
     while (match($0, /\$-([0-9]+)/, m))
-        $0 = substr($0, 1, RSTART+1) "\\v" m[1] substr($0, RSTART + RLENGTH)
+        $0 = substr($0, 1, RSTART+1) "\v" m[1] substr($0, RSTART + RLENGTH)
 }
 
 #These clean up the backquotes:
@@ -376,6 +368,10 @@ function rename_labels(line,    k, mat, pre, post, cmd, ws) {
             print rename_labels(line)
             print rename_labels(gb[2])
         } else {
+            tmp = trimmed
+            sub(/[ \t]*$/, "", tmp)
+            if (tmp ~ /p$/ && tmp !~ /s.*p$/ && tmp !~ /y.*p$/)
+                line = line ";d"
             print rename_labels(line)
         }
     }
