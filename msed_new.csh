@@ -77,7 +77,7 @@ endif
 #We also want to get rid of the space added by line 8, above:
 #And we want to prevent any "\" that is itself backquoted (\\) from being used
 #to backquote anything else. This is handled by turning them into "\a"s. 
-cat t5 | awk '{gsub(/\\\\\\;/, "\b"); gsub(/\\\\;/, "\f"); gsub(/\\\\/, "\a"); if(NR==1) sub(/^ /, ""); gsub(/;/, "\n;"); gsub(/\b/, "\\\\;"); gsub(/\f/, "\\;" ); print}' > t6
+cat t5 | awk '{gsub(/\\\\\\;/, "\b"); gsub(/\\\\;/, "\f"); gsub(/\\\\\\\\/, "\005"); gsub(/\\\\/, "\a"); if(NR==1) sub(/^ /, ""); gsub(/;/, "\n;"); gsub(/\b/, "\\\\;"); if($0 ~ /^\{/) gsub(/\\n/, "\n"); print}' > t6
 
 #Create an awk file from the part of this file below the exit:
 awk '/^# *The rest of this file is awk code/{f=1;next} f' < $0:q > t7
@@ -267,14 +267,14 @@ exit 0
 
 #Simple translations for the new commands Z, W, D, C, f, and F:
 {
-    if (sub(/^[[:space:]]*Z/, "s/.*//")) {
+    if (sub(/Z.*$/, "s/.*//")) {
         split(guard_block(), gb, "\n")
         print rename_labels(gb[1])
         print rename_labels($0)
         print rename_labels(gb[2])
         next
     }
-    if (sub(/^[[:space:]]*W/, "s/.*//;g;s/.*//;G")) {
+    if (sub(/W.*$/, "{ s/.*//;g;s/.*//;G }")) {
         split(guard_block(), gb, "\n")
         print rename_labels(gb[1])
         print rename_labels($0)
@@ -354,11 +354,26 @@ function rename_labels(line,    k, mat, pre, post, cmd, ws) {
 
 {
     gsub(/\b/, "\\\\;")
-    gsub(/\f/, "\\;")
-    gsub(/\a/, "\\\\")
+    gsub(/\a/, "\\")
+    gsub(/\005/, "\\\\\\\\")
+    if ($0 ~ /^\{/) gsub(/\\n/, "\n")
     n = split($0, lines, "\n")
     for (i = 1; i <= n; i++) {
         line = lines[i]
+        delim=""
+        if (match(line, /^s(.)/, m))
+            delim = m[1]
+        if (delim == "/")
+            gsub(/\f/, "\\\\;", line)
+        else
+            gsub(/\f/, "\\;", line)
+        if (line ~ /^\{/) {
+            gsub(/\\n/, "\n", line)
+            n2 = split(line, subl, "\n")
+            for (j=1; j<=n2; j++)
+                print rename_labels(subl[j])
+            next
+        }
         trimmed = line
         sub(/^[ \t]*/, "", trimmed)
         if (trimmed ~ /(^|[ ,0-9$\/\\])s[ \t]*[^0-9A-Za-z]/ ||
