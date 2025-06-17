@@ -39,10 +39,10 @@ run_test 13 's/foo/FOO/pg' "" 'foo\n' 'FOO\nFOO'
 run_test 14 'y;abc;ABC;' "" 'cab\n' 'CAB'
 
 run_test 15 's/\\\\/SLASH/g' "" '\\ path\n' 'SLASH path'
-run_test 16 's/\\n/NL/; s/\\\\n/DBL/' "" '\n \\n\n' 'NL DBL'
+run_test 16 's/\\n/NL/; s/\\\\n/DBL/' "" '\n \\n\n' '\n DBL\n'
 
 run_test 17 '/start/,/end/{ s/x/X/; p }' "" 'start\nx\nend\n' 'start\nstart\nX\nX\nend\nend'
 run_test 18 '{\n= }' "" 'abc\n' '1\nabc'
 
-run_test 19 '1,2Z' "" 'a\nb\nc\n' 'c'
-run_test 20 '1Wtmp.txt' "" 'line1\nline2\n' 'line2'
+run_test 19 '1,2Z' "" 'a\nb\nc\n' '\n\nc\n'
+run_test 20 '1Wtmp.txt' "" 'line1\nline2\n' '\n\nline2\n'
