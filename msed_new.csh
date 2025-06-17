@@ -43,12 +43,16 @@ if ( "$argv[1]" == "-" ) then
     shift argv
 else
     echo \ $1:q > t5
+    shift argv
 endif
 
+set nonomatch
+set noglob
+
 #Loop through all of the passed-in arguments except for the first argument:
-if ( $#argv >= 2 ) then
+if ( $#argv >= 1 ) then
 @ i = $#argv
-while ( $i >= 2 )
+while ( $i >= 1 )
    #Within the t5 file, iteratively look for the $2, then the $3, etc.
    #If you find a match, create a new file t6, where the argument is replaced
    #by the actual argument value. 
@@ -86,8 +90,6 @@ cat t6 | awk -ft7 > t8
 #Here are some initializations to set up the foreach loop that will follow:
 rm -f t9
 @ total_lines = `cat t4 | wc -l`
-set nonomatch
-set noglob
 
 #Go through the version of sed commands stored in t8 (created from Line 40
 #above), to see if any of the commands used a $-# syntax:
